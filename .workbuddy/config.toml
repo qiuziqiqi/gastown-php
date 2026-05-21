@@ -1,0 +1,34 @@
+[workbuddy]
+version = "1.0"
+
+[project]
+name = "bookan"
+type = "lumen-laravel"
+gitlab_url = "https://gitlab.example.com"
+
+[git]
+default_branch = "develop"
+workflow = "gitflow"
+merge_request_target = "develop"
+
+[agents]
+max_concurrent = 5
+default_model = "claude-sonnet"
+context_preservation = "git-backed"
+
+[paths]
+workdir = ".workbuddy"
+memory = ".workbuddy/memory"
+agents = ".workbuddy/agents"
+tasks = ".workbuddy/agents/mayor/tasks"
+poles = ".workbuddy/agents/polecats"
+
+[hooks]
+enabled = true
+pre_commit = "hooks/pre-commit"
+post_commit = "hooks/post-commit"
+
+[logging]
+level = "info"
+format = "json"
+output = ".workbuddy/logs"

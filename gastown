@@ -1,0 +1,87 @@
+#!/usr/bin/env php
+<?php
+/**
+ * Gas Town - PHP 协作管理系统
+ *
+ * 基于 Steve Yegge 的 Gas Town 理念，为 Laravel/Lumen 项目打造的多 Agent 协作工作流
+ *
+ * 用法:
+ *   php gastown install [--git-hooks]
+ *   php gastown init
+ *   php gastown assign <task_id> <description> [context_file]
+ *   php gastown complete <task_id> [summary]
+ *   php gastown status
+ */
+
+define('GASTOWN_ROOT', __DIR__);
+
+// Autoload
+spl_autoload_register(function ($class) {
+    $prefix = 'Gastown\\';
+    $baseDir = GASTOWN_ROOT . '/src/';
+    $len = strlen($prefix);
+    if (strncmp($prefix, $class, $len) !== 0) {
+        return;
+    }
+    $relativeClass = substr($class, $len);
+    $file = $baseDir . str_replace('\\', '/', $relativeClass) . '.php';
+    if (file_exists($file)) {
+        require $file;
+    }
+});
+
+if ($argc < 2) {
+    showUsage();
+    exit(1);
+}
+
+$command = $argv[1];
+$args = array_slice($argv, 2);
+
+try {
+    switch ($command) {
+        case 'install':
+            $cmd = new Gastown\Commands\InstallCommand();
+            $cmd->execute($args);
+            break;
+        case 'init':
+            $cmd = new Gastown\Commands\InitCommand();
+            $cmd->execute($args);
+            break;
+        case 'assign':
+            $cmd = new Gastown\Commands\AssignCommand();
+            $cmd->execute($args);
+            break;
+        case 'complete':
+            $cmd = new Gastown\Commands\CompleteCommand();
+            $cmd->execute($args);
+            break;
+        case 'status':
+            $cmd = new Gastown\Commands\StatusCommand();
+            $cmd->execute($args);
+            break;
+        default:
+            echo "未知命令: $command\n\n";
+            showUsage();
+            exit(1);
+    }
+} catch (\Exception $e) {
+    echo "错误: " . $e->getMessage() . "\n";
+    exit(1);
+}
+
+function showUsage() {
+    echo "╔══════════════════════════════════════════════════════════════╗\n";
+    echo "║           Gas Town - PHP 协作管理系统                        ║\n";
+    echo "╚══════════════════════════════════════════════════════════════╝\n\n";
+    echo "用法:\n";
+    echo "  php gastown install [--git-hooks]                    安装协作系统\n";
+    echo "  php gastown init                                     初始化工作目录\n";
+    echo "  php gastown assign <task_id> <description> [context] 分配任务\n";
+    echo "  php gastown complete <task_id> [summary]              完成任务\n";
+    echo "  php gastown status                                   查看状态\n\n";
+    echo "示例:\n";
+    echo "  php gastown install --git-hooks\n";
+    echo "  php gastown assign gt-001 \"实现签到功能\"\n";
+    echo "  php gastown complete gt-001 \"已完成签到API\"\n";
+}

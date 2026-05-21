@@ -1,0 +1,92 @@
+#!/usr/bin/env php
+<?php
+/**
+ * pre-commit hook - 提交前检查
+ *
+ * 对应原始 hooks/pre-commit
+ * 安装: cp hooks/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+ */
+
+// 检测 WorkBuddy 目录
+$gitTopLevel = trim(shell_exec('git rev-parse --show-toplevel 2>/dev/null'));
+$workbuddyDir = $gitTopLevel ? "$gitTopLevel/.workbuddy" : null;
+
+echo "🔍 执行提交前检查...\n";
+
+// 检查是否有未同步的上下文
+if ($workbuddyDir && is_dir($workbuddyDir)) {
+    // 检查是否有进行中的任务
+    $activeFile = "$workbuddyDir/agents/mayor/tasks/active.json";
+    if (file_exists($activeFile)) {
+        $activeContent = file_get_contents($activeFile);
+        $activeCount = substr_count($activeContent, '"id":');
+
+        if ($activeCount > 0) {
+            echo "⚠️  警告: 有 $activeCount 个进行中的任务\n";
+            echo "💡 建议: 完成当前任务后再提交代码\n";
+        }
+    }
+}
+
+// PHP 语法检查
+$whichPhp = trim(shell_exec('which php 2>/dev/null'));
+if (!empty($whichPhp)) {
+    $stagedPhp = trim(shell_exec('git diff --cached --name-only --diff-filter=ACM 2>/dev/null | grep -E \'\\.php$\' || true'));
+
+    if (!empty($stagedPhp)) {
+        echo "📝 检查 PHP 语法...\n";
+        $files = explode("\n", $stagedPhp);
+        $hasError = false;
+
+        foreach ($files as $file) {
+            $file = trim($file);
+            if (empty($file)) {
+                continue;
+            }
+
+            $output = [];
+            $returnCode = 0;
+            exec("php -l " . escapeshellarg($file) . " 2>/dev/null", $output, $returnCode);
+
+            if ($returnCode !== 0) {
+                echo "❌ PHP 语法错误: $file\n";
+                echo implode("\n", $output) . "\n";
+                $hasError = true;
+            }
+        }
+
+        if ($hasError) {
+            exit(1);
+        }
+
+        echo "✅ PHP 语法检查通过\n";
+    }
+}
+
+// Laravel 代码风格检查 (如果配置了)
+if (file_exists('vendor/bin/php-cs-fixer')) {
+    $stagedPhp = trim(shell_exec('git diff --cached --name-only --diff-filter=ACM 2>/dev/null | grep -E \'\\.php$\' || true'));
+
+    if (!empty($stagedPhp)) {
+        echo "🎨 检查代码风格...\n";
+        $files = explode("\n", $stagedPhp);
+
+        foreach ($files as $file) {
+            $file = trim($file);
+            if (empty($file)) {
+                continue;
+            }
+
+            $output = [];
+            $returnCode = 0;
+            exec('vendor/bin/php-cs-fixer fix --dry-run --diff ' . escapeshellarg($file) . ' 2>/dev/null', $output, $returnCode);
+
+            if ($returnCode !== 0) {
+                echo "⚠️  代码风格问题: $file\n";
+                echo "💡 运行 'vendor/bin/php-cs-fixer fix $file' 修复\n";
+            }
+        }
+    }
+}
+
+echo "✅ 提交前检查完成\n";

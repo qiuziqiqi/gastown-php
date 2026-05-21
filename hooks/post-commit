@@ -1,0 +1,53 @@
+#!/usr/bin/env php
+<?php
+/**
+ * post-commit hook - 提交后同步
+ *
+ * 对应原始 hooks/post-commit
+ * 安装: cp hooks/post-commit .git/hooks/post-commit && chmod +x .git/hooks/post-commit
+ */
+
+// 获取 Git 信息
+$gitTopLevel = trim(shell_exec('git rev-parse --show-toplevel 2>/dev/null'));
+if (empty($gitTopLevel)) {
+    exit(0);
+}
+
+echo "🔄 同步提交到工作记忆...\n";
+
+$workbuddyDir = "$gitTopLevel/.workbuddy";
+$timestamp = gmdate('Y-m-d\TH:i:s\Z');
+$commitMsg = trim(shell_exec('git log -1 --pretty=%B 2>/dev/null | head -n 1'));
+$commitHash = trim(shell_exec('git log -1 --pretty=%H 2>/dev/null'));
+$branch = trim(shell_exec('git branch --show-current 2>/dev/null'));
+
+// 记录提交历史
+if (is_dir("$workbuddyDir/memory")) {
+    $today = date('Y-m-d');
+    $logFile = "$workbuddyDir/memory/$today.md";
+
+    // 确保日志文件存在
+    if (!file_exists($logFile)) {
+        file_put_contents($logFile, "# $today\n\n## 工作记录\n\n## 决策记录\n\n## 待处理\n");
+    }
+
+    // 追加提交记录
+    $shortHash = substr($commitHash, 0, 8);
+    $entry = "\n\n### Git Commit: $commitHash\n- 消息: $commitMsg\n- 时间: $timestamp\n- 分支: $branch\n";
+    file_put_contents($logFile, $entry, FILE_APPEND);
+}
+
+// 同步任务状态
+$stateFile = "$workbuddyDir/agents/mayor/state.json";
+if (file_exists($stateFile)) {
+    $stateData = json_decode(file_get_contents($stateFile), true);
+    $stateData['last_commit'] = $timestamp;
+    $stateData['last_commit_msg'] = $commitMsg;
+    $stateData['last_commit_hash'] = substr($commitHash, 0, 8);
+
+    file_put_contents($stateFile, json_encode($stateData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . "\n");
+}
+
+echo "✅ 提交同步完成\n";
+echo "   Commit: " . substr($commitHash, 0, 8) . "\n";
+echo "   消息: $commitMsg\n";
